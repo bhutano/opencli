@@ -200,7 +200,8 @@ for (const [, cmd] of registry) {
     // Collect named options
     for (const arg of cmd.args) {
       if (arg.positional) continue;
-      const v = actionOpts[arg.name]; 
+      const camelName = arg.name.replace(/-([a-z])/g, (_m, ch: string) => ch.toUpperCase());
+      const v = actionOpts[arg.name] ?? actionOpts[camelName];
       if (v !== undefined) kwargs[arg.name] = v;
     }
 

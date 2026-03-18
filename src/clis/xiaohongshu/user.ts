@@ -13,10 +13,10 @@ cli({
   ],
   columns: ['id', 'title', 'type', 'likes', 'url'],
   func: async (page, kwargs) => {
+    await page.installInterceptor('v1/user/posted');
+
     await page.goto(`https://www.xiaohongshu.com/user/profile/${kwargs.id}`);
     await page.wait(5);
-
-    await page.installInterceptor('v1/user/posted');
 
     // Trigger API by scrolling
     await page.autoScroll({ times: 2, delayMs: 2000 });

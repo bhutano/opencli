@@ -22,12 +22,12 @@ cli({
   domain: 'www.xiaohongshu.com',
   strategy: Strategy.COOKIE,
   args: [
-    { name: 'note-id', required: true, help: 'Note ID (from URL)' },
+    { name: 'note_id', required: true, help: 'Note ID (from URL)' },
     { name: 'output', default: './xiaohongshu-downloads', help: 'Output directory' },
   ],
   columns: ['index', 'type', 'status', 'size'],
   func: async (page, kwargs) => {
-    const noteId = kwargs['note-id'];
+    const noteId = kwargs.note_id;
     const output = kwargs.output;
 
     // Navigate to note page
