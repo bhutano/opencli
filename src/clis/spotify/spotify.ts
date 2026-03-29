@@ -5,6 +5,13 @@ import { createServer } from 'http';
 import { homedir } from 'os';
 import { join } from 'path';
 import { exec } from 'child_process';
+import {
+  assertSpotifyCredentialsConfigured,
+  getFirstSpotifyTrack,
+  mapSpotifyTrackResults,
+  parseDotEnv,
+  resolveSpotifyCredentials,
+} from './utils.js';
 
 // ── Credentials ───────────────────────────────────────────────────────────────
 // Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET as environment variables,
@@ -16,18 +23,13 @@ const ENV_FILE = join(homedir(), '.opencli', 'spotify.env');
 
 function loadEnv(): Record<string, string> {
   if (!existsSync(ENV_FILE)) return {};
-  return Object.fromEntries(
-    readFileSync(ENV_FILE, 'utf-8')
-      .split('\n')
-      .map(l => l.trim())
-      .filter(l => l && !l.startsWith('#') && l.includes('='))
-      .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()] as [string, string]; })
-  );
+  return parseDotEnv(readFileSync(ENV_FILE, 'utf-8'));
 }
 
 const env = loadEnv();
-const CLIENT_ID     = env.SPOTIFY_CLIENT_ID     || process.env.SPOTIFY_CLIENT_ID     || '';
-const CLIENT_SECRET = env.SPOTIFY_CLIENT_SECRET || process.env.SPOTIFY_CLIENT_SECRET || '';
+const credentials = resolveSpotifyCredentials(env);
+const CLIENT_ID     = credentials.clientId;
+const CLIENT_SECRET = credentials.clientSecret;
 const REDIRECT_URI  = 'http://127.0.0.1:8888/callback';
 const SCOPES = [
   'user-read-playback-state',
@@ -107,9 +109,9 @@ async function api(method: string, path: string, body?: unknown): Promise<any> {
 
 async function findTrackUri(query: string): Promise<{ uri: string; name: string; artist: string }> {
   const data = await api('GET', `/search?q=${encodeURIComponent(query)}&type=track&limit=1`);
-  const track = data?.tracks?.items?.[0];
+  const track = getFirstSpotifyTrack(data);
   if (!track) throw new CliError('EMPTY_RESULT', `No track found for: ${query}`);
-  return { uri: track.uri, name: track.name, artist: track.artists.map((a: any) => a.name).join(', ') };
+  return track;
 }
 
 function openBrowser(url: string): void {
@@ -128,18 +130,7 @@ cli({
   args: [],
   columns: ['status'],
   func: async () => {
-    if (!CLIENT_ID || !CLIENT_SECRET) {
-      const envFile = join(homedir(), '.opencli', 'spotify.env');
-      throw new CliError(
-        'CONFIG',
-        `Missing Spotify credentials.\n\n` +
-        `1. Go to https://developer.spotify.com/dashboard and create an app\n` +
-        `2. Copy your Client ID and Client Secret\n` +
-        `3. Open the file: ${envFile}\n` +
-        `4. Replace the placeholder values and save\n` +
-        `5. Run: opencli spotify auth`
-      );
-    }
+    assertSpotifyCredentialsConfigured(credentials, ENV_FILE);
     return new Promise((resolve, reject) => {
       const server = createServer(async (req, res) => {
         try {
@@ -287,8 +278,9 @@ cli({
   func: async (_page, kwargs) => {
     const limit = Math.min(50, Math.max(1, Math.round(kwargs.limit)));
     const data = await api('GET', `/search?q=${encodeURIComponent(kwargs.query)}&type=track&limit=${limit}`);
-    if (!data?.tracks?.items) throw new CliError('EMPTY_RESULT', `No results found for: ${kwargs.query}`);
-    return data.tracks.items.map((t: any) => ({ track: t.name, artist: t.artists.map((a: any) => a.name).join(', '), album: t.album.name, uri: t.uri }));
+    const results = mapSpotifyTrackResults(data);
+    if (!results.length) throw new CliError('EMPTY_RESULT', `No results found for: ${kwargs.query}`);
+    return results;
   },
 });
 
