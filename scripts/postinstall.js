@@ -203,6 +203,7 @@ function main() {
   if (!existsSync(spotifyEnvFile)) {
     writeFileSync(spotifyEnvFile,
       `# Spotify credentials — get them at https://developer.spotify.com/dashboard\n` +
+      `# Add http://127.0.0.1:8888/callback as a Redirect URI in your Spotify app\n` +
       `SPOTIFY_CLIENT_ID=your_spotify_client_id_here\n` +
       `SPOTIFY_CLIENT_SECRET=your_spotify_client_secret_here\n`,
       'utf8'
